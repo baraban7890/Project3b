@@ -103,6 +103,14 @@ int sys_clone(void)
   if (argint(3, &stack) < 0) {
     return -1;
   }
+  if(stack%4096 != 0) // not page aligned
+  {
+    return -1;
+  }
+  if(stack/4096 != 1) //not one page
+  {
+    return -1;
+  }
   return clone((void*)fcn, (void*)arg1, (void*)arg2, (void*)stack);
 }
 
