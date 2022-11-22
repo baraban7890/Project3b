@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -111,6 +112,8 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+
+  p->isThread = 0;
 
   return p;
 }
@@ -255,10 +258,18 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
+      if(p->isThread == 1) {
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->state = UNUSED;
+      }
+      else {
       p->parent = initproc;
       if(p->state == ZOMBIE)
         wakeup1(initproc);
+      }
     }
+    
   }
 
   // Jump into the scheduler, never to return.
@@ -535,6 +546,8 @@ procdump(void)
 
 int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 {
+  cprintf("TRY TO PRINT ANYTHING");
+
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
@@ -575,6 +588,7 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   np->tf->esp = (int)stack +  PGSIZE - 3 * sizeof(int *);
   np->tf->ebp = np->tf->esp;
+  np->pid = curproc->pid;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -585,6 +599,7 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+  cprintf("%d -PID", pid);
 
   acquire(&ptable.lock);
 
@@ -600,24 +615,12 @@ int join(void **stack)
   struct proc *p;
   struct proc *curproc = myproc();
   int threads, pid;
-  struct proc *curproc = myproc();
-  struct proc *p;
-  int haveKids, pid;
-
-  acquire(&ptable.lock);
-  for(;;) {
-    haveKids = 0;
-
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      if (p->parent != curproc || p->isThread != 1 )
-        continue;
-      haveKids = 1;
 
   acquire(&ptable.lock);
   for (;;) {
     threads = 0;
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      if (p->parent != curproc) {
+      if (p->parent != curproc || p->pgdir != p->parent->pgdir) {
         continue;
       }
       threads = 1;
@@ -630,6 +633,7 @@ int join(void **stack)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        //stack = p->ustack;
         release(&ptable.lock);
         return pid;
       }
@@ -638,31 +642,8 @@ int join(void **stack)
       release(&ptable.lock);
       return -1;
     }
+    //wait();
     sleep(curproc, &ptable.lock);
-  }
-    return 0;
-      if (p->state == ZOMBIE) {
-        pid = p->pid;
-        kfree(p->kstack);
-        p->kstack = 0;
-        p->state = UNUSED;
-        p->pid = 0;
-        p->parent = 0;
-        p->name[0] = 0;
-        p->killed = 0;
-        *stack = p->ustack;
-        release(&ptable.lock);
-        return pid;
-      }
-    }
-    
-    if (!haveKids || curproc->killed) {
-      release(&ptable.lock);
-      return -1;
-    }
-
-    sleep(curproc, &ptable.lock);
-
   }
   return 0;
 }
