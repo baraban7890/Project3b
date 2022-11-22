@@ -8349,7 +8349,6 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 801042f8:	f3 a5                	rep movsl %ds:(%esi),%es:(%edi)
 
 
-
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
   np->tf->eip = (uint)fcn;

@@ -556,8 +556,6 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   *np->tf = *curproc->tf;
 
 
-
-
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
   np->tf->eip = (uint)fcn;
@@ -598,7 +596,36 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
 int join(void **stack)
 {
-  int pid = wait();
+  struct proc *p;
+  struct proc *curproc = myproc();
+  int threads, pid;
 
-  return pid;
+  acquire(&ptable.lock);
+  for (;;) {
+    threads = 0;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if (p->parent != curproc) {
+        continue;
+      }
+      threads = 1;
+      if(p->state ==ZOMBIE) {
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+    if(!threads || curproc->killed) {
+      release(&ptable.lock);
+      return -1;
+    }
+    sleep(curproc, &ptable.lock);
+  }
+    return 0;
 }
