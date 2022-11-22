@@ -539,7 +539,10 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   struct proc *np;
   struct proc *curproc = myproc();
 
-  assert(curproc->sz > stack); // piazza post # 1589
+  if(curproc->sz > (int)stack)
+  {
+    return -1;
+  } // piazza post # 1589
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -548,18 +551,29 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   // Copy process state from proc.
   np->pgdir = curproc->pgdir;
-  np->ustack = stack;
+  np->ustack = (uint)stack;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+
+
+
   // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0xffffffff;
+  np->tf->eax = 0;
+  np->tf->eip = (uint)fcn;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
+
+  uint sp, ustack[3];
+	sp = (uint)stack+4096;
+	ustack[0] = 0xffffffff;
+	ustack[1] = (uint)arg1;
+  ustack[2] = (uint)arg2;
+
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -571,10 +585,12 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   release(&ptable.lock);
 
-  exit();
+  return pid;
 }
 
 int join(void **stack)
 {
+  int pid = wait();
 
+  return -1;
 }
