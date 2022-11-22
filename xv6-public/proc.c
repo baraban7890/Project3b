@@ -558,28 +558,29 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
-  np->tf->eip = (uint)fcn;
+  np->tf->eip = (uint) fcn;
+  np->ustack = stack;
+  np->isThread = 1;
+
+  uint *retval;
+  uint *argone;
+  uint *argtwo;
+
+  retval = stack + PGSIZE - 3 * sizeof(void*);
+  *retval = 0xffffffff;
+  argone = stack + PGSIZE - 2 * sizeof(void*);
+  *argone = (uint) arg1;
+  argtwo = stack + PGSIZE - 1 * sizeof(void*);
+  *argtwo = (uint) arg2;
+
+  np->tf->esp = (int)stack +  PGSIZE - 3 * sizeof(int *);
+  np->tf->ebp = np->tf->esp;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
-  np->cwd = idup(curproc->cwd);
+  np->cwd = idup(curproc->cwd);  
 
-  uint sp;
-  void* ustack[3];
-  sp = (uint)stack+4096;
-  sp -= sizeof(void*);
-  if(copyout(np->pgdir,sp,arg1,sizeof(void*))<0) 
-    return -1;
-  sp -= sizeof(void*);
-  if(copyout(np->pgdir,sp,arg2,sizeof(void*))<0) 
-    return -1;
-  sp -= sizeof(void*);
-  if (copyout(np->pgdir, sp, ustack, sizeof(void*)) < 0) {
-	  if (np->pgdir) freevm(np->pgdir);
-		return -1;
-	}
-  np->tf->esp = sp;
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -599,6 +600,18 @@ int join(void **stack)
   struct proc *p;
   struct proc *curproc = myproc();
   int threads, pid;
+  struct proc *curproc = myproc();
+  struct proc *p;
+  int haveKids, pid;
+
+  acquire(&ptable.lock);
+  for(;;) {
+    haveKids = 0;
+
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if (p->parent != curproc || p->isThread != 1 )
+        continue;
+      haveKids = 1;
 
   acquire(&ptable.lock);
   for (;;) {
@@ -628,4 +641,28 @@ int join(void **stack)
     sleep(curproc, &ptable.lock);
   }
     return 0;
+      if (p->state == ZOMBIE) {
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->state = UNUSED;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        *stack = p->ustack;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+    
+    if (!haveKids || curproc->killed) {
+      release(&ptable.lock);
+      return -1;
+    }
+
+    sleep(curproc, &ptable.lock);
+
+  }
+  return 0;
 }
