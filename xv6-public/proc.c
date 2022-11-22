@@ -552,10 +552,10 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   struct proc *np;
   struct proc *curproc = myproc();
 
-  if(curproc->sz > (int)stack)
-  {
-    return -1;
-  } // piazza post # 1589
+  // if(curproc->sz < (int)stack)
+  // {
+  //   return -1;
+  // } // piazza post # 1589
 
   // Allocate process.
   if((np = allocproc()) == 0){
