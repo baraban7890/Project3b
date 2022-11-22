@@ -4,6 +4,7 @@
 #include "user.h"
 #include "x86.h"
 
+
 char *
 strcpy(char *s, const char *t)
 {
@@ -102,30 +103,47 @@ memmove(void *vdst, const void *vsrc, int n)
   return vdst;
 }
 
-int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2) {
+int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
+{
   int pid;
-  void *stack = malloc(4096);
+  lock_t lock;
+  lock_init(&lock);
+  lock_acquire(&lock);
 
-  pid = clone(start_routine,arg1,arg2, stack);
+  void *stack = malloc(4096 * 2);
+
+  pid = clone(start_routine, arg1, arg2, stack);
 
   return pid;
 }
 
-int thread_join() {
+int thread_join()
+{
   int pid;
-  void **stack;
-  pid = join(stack);
+  void *stack = malloc(sizeof(void *));
+
+  pid = join(&stack);
+
+  lock_t lock;
+  lock_init(&lock);
+  lock_acquire(&lock);
   free(stack);
+  lock_release(&lock);
 
   return pid;
 }
 
-void lock_acquire(lock_t *) {
-  
+void lock_acquire(lock_t *lock)
+{
+  while (lock->flag == 1)
+    ;
+  lock->flag = 1;
 }
-void lock_release(lock_t *) {
-  
+void lock_release(lock_t *lock)
+{
+  lock->flag = 0;
 }
-void lock_init(lock_t *) {
-  
+void lock_init(lock_t *lock)
+{
+  lock->flag = 0; // lock is available
 }

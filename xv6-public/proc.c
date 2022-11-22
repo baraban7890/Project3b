@@ -574,5 +574,5 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
 int join(void **stack)
 {
-
+  return -1;
 }
