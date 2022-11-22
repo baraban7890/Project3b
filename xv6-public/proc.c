@@ -539,6 +539,8 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   struct proc *np;
   struct proc *curproc = myproc();
 
+  assert(curproc->sz > stack); // piazza post # 1589
+
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -569,7 +571,7 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   release(&ptable.lock);
 
-  return pid;
+  exit();
 }
 
 int join(void **stack)
