@@ -551,7 +551,6 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
 
   // Copy process state from proc.
   np->pgdir = curproc->pgdir;
-  np->ustack = (uint)stack;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -568,12 +567,21 @@ int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
 
-  uint sp, ustack[3];
-	sp = (uint)stack+4096;
-	ustack[0] = 0xffffffff;
-	ustack[1] = (uint)arg1;
-  ustack[2] = (uint)arg2;
-
+  uint sp;
+  void* ustack[3];
+  sp = (uint)stack+4096;
+  sp -= sizeof(void*);
+  if(copyout(np->pgdir,sp,arg1,sizeof(void*))<0) 
+    return -1;
+  sp -= sizeof(void*);
+  if(copyout(np->pgdir,sp,arg2,sizeof(void*))<0) 
+    return -1;
+  sp -= sizeof(void*);
+  if (copyout(np->pgdir, sp, ustack, sizeof(void*)) < 0) {
+	  if (np->pgdir) freevm(np->pgdir);
+		return -1;
+	}
+  np->tf->esp = sp;
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -592,5 +600,5 @@ int join(void **stack)
 {
   int pid = wait();
 
-  return -1;
+  return pid;
 }
