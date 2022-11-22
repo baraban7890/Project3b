@@ -31,12 +31,17 @@ main(int argc, char *argv[])
    else
      stack = p;
 
+   printf(1, "about to do clone\n");
    int clone_pid = clone(worker, 0, 0, stack);
+
+   printf(1, "just cloned\n");
+   
    assert(clone_pid > 0);
    while(global != 5);
    printf(1, "TEST PASSED\n");
    
    void *join_stack;
+   printf(1, "about to join\n");
    int join_pid = join(&join_stack);
    assert(join_pid == clone_pid);
    free(p);
